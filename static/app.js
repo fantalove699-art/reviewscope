@@ -181,6 +181,12 @@
       if (!text) { alert('请先输入评论内容'); return; }
       const rounds = parseInt($$('#azSeg .seg-btn.active')[0].dataset.rounds, 10) || 1;
 
+      if (!state.config.endpoint || !state.config.apiKey || !state.config.model) {
+        alert('请先在「数据管理」页面配置您的 LLM API！');
+        $$('.tab-btn')[3].click();
+        return;
+      }
+
       showLoader({ title: '剖析中', sub: '调用后端 API ...' });
       logLine('目标：分析 ' + (text.length > 40 ? text.slice(0, 40) + '…' : text), true);
       $('#azRunBtn').disabled = true;
