@@ -34,13 +34,25 @@
       headers: { 'Content-Type': 'application/json' },
     };
     if (body !== undefined) opts.body = JSON.stringify(body);
-    const resp = await fetch(path, opts);
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => '');
-      throw new Error('HTTP ' + resp.status + ' — ' + (errText || resp.statusText));
+    if (abortCtrl) opts.signal = abortCtrl.signal;
+    const timeoutMs = 60000;
+    const timer = setTimeout(() => {
+      if (abortCtrl) try { abortCtrl.abort(); } catch (e) {}
+    }, timeoutMs);
+    try {
+      const resp = await fetch(path, opts);
+      clearTimeout(timer);
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        throw new Error('HTTP ' + resp.status + ' — ' + (errText || resp.statusText));
+      }
+      const ct = resp.headers.get('content-type') || '';
+      return ct.includes('application/json') ? resp.json() : resp.text();
+    } catch (e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw new Error('请求已取消或超时');
+      throw e;
     }
-    const ct = resp.headers.get('content-type') || '';
-    return ct.includes('application/json') ? resp.json() : resp.text();
   }
 
   async function loadConfig() {
@@ -114,14 +126,19 @@
   // =========================================================================
   //  LOADER OVERLAY
   // =========================================================================
+  let abortCtrl = null;
   function showLoader(inf) {
     const ov = $('#loader'); ov.hidden = false;
     $('#loaderTitle').textContent = inf?.title || '运行中';
     $('#loaderSub').textContent = inf?.sub || '...';
     $('#loaderFill').style.width = '0%';
     $('#loaderLog').innerHTML = '';
+    try { abortCtrl = new AbortController(); } catch (e) { abortCtrl = null; }
   }
-  function hideLoader() { $('#loader').hidden = true; }
+  function hideLoader() {
+    $('#loader').hidden = true;
+    if (abortCtrl) { try { abortCtrl.abort(); } catch (e) {} abortCtrl = null; }
+  }
   function setProgress(pct, sub) {
     $('#loaderFill').style.width = pct + '%';
     if (sub) $('#loaderSub').textContent = sub;
@@ -800,6 +817,8 @@
   // =========================================================================
   document.addEventListener('DOMContentLoaded', async function boot() {
     initTabs();
+    const cancelBtn = document.getElementById('loaderCancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => hideLoader());
     showLoader({ title: '初始化', sub: '加载配置与数据集 ...' });
     try {
       await Promise.all([loadConfig(), loadDataset()]);

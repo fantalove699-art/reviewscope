@@ -112,7 +112,7 @@ def call_llm(cfg, text: str, rounds: int) -> dict:
                 "LLM call %d/%d: model=%s endpoint=%s",
                 i + 1, rounds, cfg["model"], cfg["endpoint"],
             )
-            resp = requests.post(cfg["endpoint"], headers=headers, json=payload, timeout=120)
+            resp = requests.post(cfg["endpoint"], headers=headers, json=payload, timeout=30)
             resp.raise_for_status()
             data = resp.json()
             content = data["choices"][0]["message"]["content"]

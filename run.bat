@@ -1,30 +1,32 @@
 @echo off
 setlocal
 
-set PYTHON_PATH=D:\Program Files\Anaconda\python.exe
+REM ===== ReviewScope 一键启动（Windows）=====
+REM  用法：双击本文件即可
+
 set SCRIPT_DIR=%~dp0
 cd /d "%SCRIPT_DIR%"
 
-echo ========================================
-echo   Starting Flask Server
-echo ========================================
+REM --- 1. 定位 Python ---
+set PYTHON_PATH=D:\Program Files\Anaconda\python.exe
+echo ============================================================
+echo   ReviewScope - Flask Backend
+echo ============================================================
 echo.
+echo [1/3] 正在查找 Python ...
 
-echo [Step 1] Checking Python ...
 if exist "%PYTHON_PATH%" (
-    echo   Python found at: "%PYTHON_PATH%"
-    set PYTHON_CMD="%PYTHON_PATH%"
+    echo       已找到: %PYTHON_PATH%
+    set "PYTHON_CMD=%PYTHON_PATH%"
 ) else (
-    echo   Python not found at "%PYTHON_PATH%"
-    echo   Trying 'python' from system PATH ...
+    echo       未找到 "%PYTHON_PATH%"，尝试系统 PATH ...
     where python >nul 2>&1
     if %errorlevel%==0 (
-        set PYTHON_CMD=python
-        echo   Python found in system PATH.
+        echo       已找到（系统 PATH）
+        set "PYTHON_CMD=python"
     ) else (
         echo.
-        echo [ERROR] Python is not installed or not found.
-        echo Please install Python or add it to the system PATH.
+        echo [错误] 找不到 Python。请确认已安装 Python 3。
         echo.
         pause
         exit /b 1
@@ -32,41 +34,40 @@ if exist "%PYTHON_PATH%" (
 )
 echo.
 
-echo [Step 2] Checking Flask ...
-%PYTHON_CMD% -c "import flask; print(flask.__version__)" >nul 2>&1
+REM --- 2. 检查依赖 ---
+echo [2/3] 检查 Python 依赖 ...
+"%PYTHON_CMD%" -c "import flask, requests" >nul 2>&1
 if %errorlevel%==0 (
-    echo   Flask is already installed.
+    echo       依赖已就绪
 ) else (
-    echo   Flask is not installed. Installing dependencies ...
-    %PYTHON_CMD% -m pip install -r requirements.txt
+    echo       缺少依赖，正在安装 ...
+    "%PYTHON_CMD%" -m pip install -r requirements.txt
     if %errorlevel% neq 0 (
         echo.
-        echo [ERROR] Failed to install requirements.
+        echo [错误] 依赖安装失败
         echo.
         pause
         exit /b 1
     )
-    echo   Dependencies installed successfully.
+    echo       安装完成
 )
 echo.
 
-echo [Step 3] Opening browser to http://localhost:8000 ...
-start http://localhost:8000
+REM --- 3. 打开浏览器并启动 Flask ---
+echo [3/3] 启动服务器（端口 8000）...
+echo       启动后请在浏览器打开: http://localhost:8000
+echo       关闭本窗口或按 Ctrl+C 即可停止
 echo.
+echo ============================================================
 
-echo [Step 4] Starting Flask server on http://localhost:8000 ...
-echo   Server command: %PYTHON_CMD% -m flask run --host=0.0.0.0 --port=8000
-echo.
-echo ========================================
-echo   Press Ctrl+C to stop the server
-echo ========================================
-echo.
+REM 先启动 Flask（阻塞方式），同时 2 秒后用 start 打开浏览器
+start "" cmd /c "timeout /t 2 >nul && start http://localhost:8000"
 
-%PYTHON_CMD% -m flask run --host=0.0.0.0 --port=8000
+"%PYTHON_CMD%" app.py
 
 if %errorlevel% neq 0 (
     echo.
-    echo [ERROR] Server failed to start (exit code: %errorlevel%).
+    echo [错误] 服务器启动失败（退出码: %errorlevel%）
     echo.
     pause
 )
