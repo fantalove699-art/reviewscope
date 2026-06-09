@@ -832,5 +832,10 @@
     initData();
     setStatus('就绪', '#c6ff3d');
     updateChips();
+    
+    if (!state.config.endpoint || !state.config.apiKey || !state.config.model) {
+      $$('.tab-btn')[3].click();
+      alert('请先在「数据管理」页面配置您的 LLM API，然后再进行分析');
+    }
   });
 })();
