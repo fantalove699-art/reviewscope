@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ReviewScope · 产品评论 LLM 评测工作台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Archivo+Black&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="grid-bg"></div>
+  <div class="noise"></div>
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo-mark">
+        <span class="logo-dot"></span>
+        <span class="logo-ring"></span>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">REVIEWSCOPE<span>·LAB</span></div>
+        <div class="brand-sub">LLM 产品评论评测工作台 · Precision / Recall / F1</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="config-chip" id="configChip">
+        <span class="chip-label">LLM</span>
+        <span class="chip-value" id="chipModel">未配置</span>
+      </div>
+      <div class="config-chip" id="datasetChip">
+        <span class="chip-label">DATASET</span>
+        <span class="chip-value" id="chipDataset">0 条</span>
+      </div>
+      <div class="status-pill">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">就绪</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ TAB NAV ============ -->
+  <nav class="tabnav">
+    <button class="tab-btn active" data-tab="analyze">
+      <span class="tab-num">01</span>
+      <span class="tab-name">快速分析</span>
+      <span class="tab-desc">单条评论 → 产品/属性/颗粒度</span>
+    </button>
+    <button class="tab-btn" data-tab="annotate">
+      <span class="tab-num">02</span>
+      <span class="tab-name">样本标注</span>
+      <span class="tab-desc">构建标注集（gold standard）</span>
+    </button>
+    <button class="tab-btn" data-tab="benchmark">
+      <span class="tab-num">03</span>
+      <span class="tab-name">模型评测</span>
+      <span class="tab-desc">Precision · Recall · F1</span>
+    </button>
+    <button class="tab-btn" data-tab="data">
+      <span class="tab-num">04</span>
+      <span class="tab-name">数据管理</span>
+      <span class="tab-desc">导入 / 导出 / LLM 配置</span>
+    </button>
+  </nav>
+
+  <!-- ============ MAIN ============ -->
+  <main class="workbench">
+
+    <!-- ---------- TAB 1: ANALYZE ---------- -->
+    <section class="tab-panel active" data-tab="analyze">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title-block">
+            <span class="panel-index">[01]</span>
+            <h2>快速分析 · Quick Analyze</h2>
+          </div>
+          <span class="muted-text">对单条评论做 LLM 提取，不参与评测分数</span>
+        </div>
+
+        <div class="split-2">
+          <div class="section-block">
+            <label class="field-label">
+              <span class="field-name">评论内容</span>
+              <span class="field-hint">空行会被视为多条评论</span>
+            </label>
+            <textarea id="azReviews" class="text-area" rows="8" placeholder="例如：这款索尼 WH-1000XM5 降噪耳机，地铁里几乎听不到噪音，但耳罩有点紧，戴久了耳朵疼。低音下潜不错，高音稍微刺耳。"></textarea>
+            <div class="row-between" style="margin-top:10px">
+              <button class="ghost-btn" id="azSampleBtn">+ 加载示例</button>
+              <span class="pill-label" id="azRoundLabel">准确度评估轮次：1 轮</span>
+              <div class="segmented inline" id="azSeg">
+                <button class="seg-btn active" data-rounds="1">1</button>
+                <button class="seg-btn" data-rounds="2">2</button>
+                <button class="seg-btn" data-rounds="3">3</button>
+                <button class="seg-btn" data-rounds="4">4</button>
+              </div>
+            </div>
+            <button class="primary-btn" id="azRunBtn" style="margin-top:14px">
+              <span class="btn-text">▶ 运行 LLM 分析</span>
+              <span class="btn-arrow">→</span>
+            </button>
+          </div>
+
+          <div class="section-block result-block">
+            <div class="result-head">
+              <span class="block-tag">RESULT</span>
+              <span class="muted-text" id="azMeta">等待分析</span>
+            </div>
+            <div class="empty-state" id="azEmpty">
+              <div class="empty-glyph">◈</div>
+              <p>提交后此处展示：识别产品、提取属性、颗粒度子属性、模型综合置信度</p>
+            </div>
+            <div class="result-scroll" id="azResult" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- TAB 2: ANNOTATE ---------- -->
+    <section class="tab-panel" data-tab="annotate">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title-block">
+            <span class="panel-index">[02]</span>
+            <h2>样本标注 · Gold Standard</h2>
+          </div>
+          <span class="muted-text">每条样本包含：评论 + 人工标注的产品/属性/颗粒度</span>
+        </div>
+
+        <div class="split-2">
+          <!-- 左侧：列表 -->
+          <div class="section-block">
+            <div class="sub-head">
+              <span class="block-tag">SAMPLES</span>
+              <span class="muted-text" id="anCount">0 条样本</span>
+            </div>
+            <div class="row-between" style="margin-bottom:10px">
+              <button class="primary-btn small" id="anNewBtn">+ 新建样本</button>
+              <button class="ghost-btn small" id="anSeedBtn">插入演示 5 条</button>
+            </div>
+            <div class="sample-list" id="anList"></div>
+          </div>
+
+          <!-- 右侧：编辑器 -->
+          <div class="section-block">
+            <div class="sub-head">
+              <span class="block-tag">EDITOR</span>
+              <span class="muted-text" id="anEditorMeta">选择或新建一条样本</span>
+            </div>
+            <div class="empty-state small" id="anEmpty">
+              <p>点击左侧样本开始编辑，或点击"+ 新建样本"</p>
+            </div>
+            <div class="editor-wrap" id="anEditor" hidden>
+              <label class="field-label"><span class="field-name">评论原文</span></label>
+              <textarea id="anReview" class="text-area" rows="5" placeholder="粘贴评论文本 ..."></textarea>
+
+              <label class="field-label" style="margin-top:14px">
+                <span class="field-name">产品实体</span>
+                <button class="tiny-btn" data-action="addProduct">+ 添加</button>
+              </label>
+              <div id="anProducts" class="chips-area"></div>
+
+              <label class="field-label" style="margin-top:14px">
+                <span class="field-name">属性（一级）& 颗粒度子属性</span>
+                <button class="tiny-btn" data-action="addAttr">+ 添加</button>
+              </label>
+              <div id="anAttrs" class="attr-editor-list"></div>
+
+              <div class="row-between" style="margin-top:18px">
+                <button class="ghost-btn small danger" id="anDeleteBtn">删除此样本</button>
+                <button class="primary-btn small" id="anSaveBtn">✓ 保存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- TAB 3: BENCHMARK ---------- -->
+    <section class="tab-panel" data-tab="benchmark">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title-block">
+            <span class="panel-index">[03]</span>
+            <h2>模型评测 · Benchmark</h2>
+          </div>
+          <span class="muted-text">对全部标注样本跑 LLM，并与标注结果算 P / R / F1</span>
+        </div>
+
+        <!-- 汇总卡片 -->
+        <div class="score-grid" id="bmSummary" hidden>
+          <div class="score-card">
+            <div class="score-name">OVERALL F1</div>
+            <div class="score-value" id="smF1">--</div>
+            <div class="score-sub">宏平均 · 产品+属性综合</div>
+          </div>
+          <div class="score-card">
+            <div class="score-name">PRODUCTS</div>
+            <div class="score-row"><span>P</span><b id="smProdP">--</b></div>
+            <div class="score-row"><span>R</span><b id="smProdR">--</b></div>
+            <div class="score-row"><span>F1</span><b id="smProdF1">--</b></div>
+          </div>
+          <div class="score-card">
+            <div class="score-name">ATTRIBUTES</div>
+            <div class="score-row"><span>P</span><b id="smAttrP">--</b></div>
+            <div class="score-row"><span>R</span><b id="smAttrR">--</b></div>
+            <div class="score-row"><span>F1</span><b id="smAttrF1">--</b></div>
+          </div>
+          <div class="score-card">
+            <div class="score-name">SENTIMENT</div>
+            <div class="score-row"><span>Acc</span><b id="smSent">--</b></div>
+            <div class="score-sub">情感标签匹配准确率</div>
+            <div class="score-sub small" id="smMeta"></div>
+          </div>
+        </div>
+
+        <div class="row-between" style="margin:14px 0">
+          <div class="row-left">
+            <button class="primary-btn" id="bmRunBtn">▶ 运行评测</button>
+            <button class="ghost-btn" id="bmClearBtn">清除结果</button>
+          </div>
+          <span class="muted-text" id="bmStatusLine">将对全部样本逐样本运行 LLM · 完成后逐项对比</span>
+        </div>
+
+        <div class="bm-table-wrap">
+          <table class="bm-table" id="bmTable">
+            <thead>
+              <tr>
+                <th style="width:44px">#</th>
+                <th>评论摘要</th>
+                <th style="width:120px">产品 F1</th>
+                <th style="width:120px">属性 F1</th>
+                <th style="width:120px">情感 Acc</th>
+                <th style="width:180px">状态</th>
+              </tr>
+            </thead>
+            <tbody id="bmTbody">
+              <tr><td colspan="6" class="table-empty">尚未运行评测。先在【样本标注】中添加样本，再点击"运行评测"。</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="bmDetail" hidden style="margin-top:18px">
+          <div class="result-head">
+            <span class="block-tag">DETAIL</span>
+            <span class="muted-text" id="bmDetailTitle">点击表格中的任意一行查看该条样本详细对比</span>
+          </div>
+          <div class="detail-columns" id="bmDetailBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- TAB 4: DATA ---------- -->
+    <section class="tab-panel" data-tab="data">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title-block">
+            <span class="panel-index">[04]</span>
+            <h2>数据管理 · Data</h2>
+          </div>
+          <span class="muted-text">LLM 配置存储在浏览器 localStorage，标注集可导入/导出 JSON</span>
+        </div>
+
+        <div class="split-2">
+          <div class="section-block">
+            <div class="sub-head"><span class="block-tag">LLM 配置</span></div>
+            <label class="field-label"><span class="field-name">Endpoint</span><span class="field-hint">OpenAI 兼容协议</span></label>
+            <input type="text" id="cfgEndpoint" class="text-input" value="https://api.openai.com/v1/chat/completions" />
+            <label class="field-label" style="margin-top:12px"><span class="field-name">API Key</span><span class="field-hint">仅本地使用</span></label>
+            <input type="password" id="cfgKey" class="text-input" placeholder="sk-..." />
+            <div class="row-between" style="margin-top:12px">
+              <div style="flex:1; margin-right:10px">
+                <label class="field-label"><span class="field-name">Model</span></label>
+                <input type="text" id="cfgModel" class="text-input" value="gpt-4o-mini" placeholder="gpt-4o-mini" />
+              </div>
+              <div style="width:120px">
+                <label class="field-label"><span class="field-name">Temperature</span></label>
+                <input type="number" id="cfgTemp" class="text-input" value="0.3" step="0.1" min="0" max="2" />
+              </div>
+            </div>
+            <button class="primary-btn" id="cfgSaveBtn" style="margin-top:14px">✓ 保存 LLM 配置</button>
+          </div>
+
+          <div class="section-block">
+            <div class="sub-head"><span class="block-tag">数据集</span></div>
+            <p class="muted-text" style="margin:6px 0 10px">导出为 JSON 文件，便于团队共享；或导入之前保存的数据集，将覆盖当前数据。</p>
+            <div class="dataset-stats" id="dsStats"></div>
+            <div class="row-between" style="margin-top:14px">
+              <button class="primary-btn" id="dsExportBtn">↓ 导出 JSON</button>
+              <button class="ghost-btn" id="dsImportBtn">↑ 导入 JSON</button>
+              <button class="ghost-btn danger" id="dsClearBtn">× 清空数据集</button>
+            </div>
+            <input type="file" id="dsFileInput" accept="application/json" hidden />
+
+            <div class="sub-head" style="margin-top:22px"><span class="block-tag">SCHEMA</span></div>
+            <pre class="raw-json">
+{
+  "version": 1,
+  "createdAt": "2026-06-09T...",
+  "samples": [
+    {
+      "id": "uuid",
+      "review": "评论文本",
+      "products": [ { "name": "Sony WH-1000XM5" } ],
+      "attributes": [
+        {
+          "name": "降噪",
+          "sentiment": "positive",
+          "sub_attributes": [ { "name": "低频", "value": "强" } ],
+          "quotes": ["地铁里几乎听不到噪音"]
+        }
+      ]
+    }
+  ]
+}</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============ LOADER ============ -->
+  <div class="loader-overlay" id="loader" hidden>
+    <div class="loader-card">
+      <div class="loader-title" id="loaderTitle">正在剖析</div>
+      <div class="loader-sub" id="loaderSub">联系 LLM ...</div>
+      <div class="loader-bar"><div class="loader-bar-fill" id="loaderFill"></div></div>
+      <div class="loader-log" id="loaderLog"></div>
+    </div>
+  </div>
+
+  <footer class="footbar">
+    <span>ReviewScope v1.0 · 构建于 HTML + CSS + 原生 JS · 数据仅保存在浏览器本地</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
